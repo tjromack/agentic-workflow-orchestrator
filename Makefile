@@ -24,8 +24,7 @@ test:           ## Run the test suite
 	$(PY) -m pytest -q
 
 reset:          ## Clear runs + re-seed for a clean demo
-	@echo "reset: no run-state to clear yet; re-seeding."
-	$(PY) -m app.seed
+	$(PY) -m app.seed --reset
 
 fmt:            ## Format code (placeholder until a formatter is wired)
 	@echo "fmt: no formatter configured yet."
