@@ -5,6 +5,9 @@ uvicorn[standard]==0.34.0
 # Templating (HTMX is loaded client-side via CDN in base.html)
 jinja2==3.1.5
 
+# Form parsing for HTMX POSTs
+python-multipart==0.0.20
+
 # Schema validation for the typed tool registry
 jsonschema==4.23.0
 

@@ -66,6 +66,39 @@ These are the script for "why did you build it this way?" Add an entry on every 
 - Why: Auditability is what separates a demo from something operable. It's also the debugging and
   trust mechanism — you can always answer "what did it do and why?"
 
+## 011. Provider abstraction with a deterministic planner fallback
+- Phase: 2
+- Decision: A tiny `Provider` interface (`complete(system, user) -> str`) backs the
+  planner; `make_provider` returns Anthropic, Ollama, or `None`. With no provider
+  (no API key) — or if the provider call fails — the planner emits a deterministic
+  built-in plan. The plan records the actual `model_provider` / `model_name` used,
+  including a "(fallback: …)" note when it fell back.
+- Alternatives considered: Require an API key; hard-code Anthropic; fail closed when
+  the model is unavailable.
+- Why: The demo must run cold and offline (Decision 010) yet still show real LLM
+  planning when a key is present. Fallback keeps the demo resilient; recording the
+  true provider/model keeps the audit honest.
+- Tradeoff accepted: A silent fallback could mask a misconfigured key; mitigated by
+  surfacing the fallback reason in the recorded model name.
+- Revisit if: We want planning failures to halt loudly rather than degrade.
+
+## 012. The plan is a first-class persisted object; allowlist enforced post-hoc
+- Phase: 2
+- Decision: `Plan`/`PlanStep` are explicit dataclasses persisted to SQLite (runs +
+  plans tables) with model + prompt version. After any planner produces steps, every
+  referenced tool is validated against the registry and each step's `consequential`
+  flag is overwritten from the registry (the registry, not the model, is
+  authoritative). Cross-step data flow uses `{"$ref": "stepN.field"}` references.
+- Alternatives considered: Keep the plan as transient model output; trust the model's
+  own tool list and flags; persist plans as loose JSON files.
+- Why: An inspectable, persisted plan is what makes the system auditable and
+  checkpoint-able (Decision 002). Validating tools post-hoc means even an LLM that
+  hallucinates a tool cannot get a disallowed step into a plan. SQLite is the
+  documented store and resets cleanly for demos.
+- Tradeoff accepted: A separate validation pass and a ref-resolution convention the
+  executor must honor (Phase 3); worth it for the allowlist guarantee.
+- Revisit if: Plans need richer control flow (branches/loops) than a linear ref DAG.
+
 ## 009. JSON Schema (Draft 2020-12) validated in the registry's call path
 - Phase: 1
 - Decision: Tools declare plain JSON Schema for input and output; `registry.call`

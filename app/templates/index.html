@@ -2,18 +2,34 @@
 
 {% block content %}
 <div class="card">
-  <p><strong>Scaffold is live.</strong> This is a general-purpose engine for running
-  multi-step AI workflows safely. The lead demo is a neutral
-  <em>research-to-brief</em> agent.</p>
-  <p>Build status: Phase 0 (scaffold). Coming next:</p>
-  <ul>
-    <li>Phase 1 — MCP-style tool registry (typed schemas + allowlist)</li>
-    <li>Phase 2 — Planner (goal &rarr; inspectable plan)</li>
-    <li>Phase 3 — Executor with guardrails</li>
-    <li>Phase 4 — Human checkpoints</li>
-    <li>Phase 5 — Audit log &amp; run viewer</li>
-    <li>Phase 6 — Research-to-brief demo &amp; polish</li>
+  <p><strong>Pose a goal.</strong> The planner emits an explicit, inspectable plan —
+  each step uses only a registered, allowlisted tool — and nothing executes until
+  you can see it. (Execution lands in a later phase.)</p>
+
+  <form hx-post="/plan" hx-target="#plan" hx-swap="innerHTML" hx-disabled-elt="button">
+    <textarea name="goal" rows="2" style="width:100%; box-sizing:border-box;"
+              placeholder="e.g. Write a short research brief on urban green roofs.">{{ goals[0].question if goals else "" }}</textarea>
+    <div style="margin-top:.5rem;">
+      <button type="submit">Plan it</button>
+    </div>
+  </form>
+
+  {% if goals %}
+  <p class="tag" style="margin-top:.75rem;">Seeded goals:</p>
+  <ul class="tag">
+    {% for g in goals %}<li>{{ g.question }}</li>{% endfor %}
   </ul>
-  <p class="tag">Health check: <code>GET /health</code></p>
+  {% endif %}
+</div>
+
+<div id="plan"></div>
+
+<div class="card">
+  <p class="tag">Allowlisted tools ({{ tools|length }}):</p>
+  <ul class="tag">
+    {% for t in tools %}
+    <li><code>{{ t.name }}</code>{% if t.consequential %} — consequential{% endif %}</li>
+    {% endfor %}
+  </ul>
 </div>
 {% endblock %}

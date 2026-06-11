@@ -1,0 +1,24 @@
+<div class="card">
+  <h2 style="margin-top:0;">Plan</h2>
+  <p class="tag">
+    run <code>{{ run_id }}</code> ·
+    model: {{ plan.model_provider }} / {{ plan.model_name }} ·
+    prompt: {{ plan.prompt_version }}
+  </p>
+  <p><em>{{ plan.goal }}</em></p>
+
+  <ol>
+    {% for step in plan.steps %}
+    <li style="margin-bottom:.85rem;">
+      <code>{{ step.tool }}</code>
+      {% if step.consequential %}
+        <span class="tag" style="color:#c0392b;">⚠ consequential — will pause for approval</span>
+      {% endif %}
+      <div>{{ step.description }}</div>
+      <div class="tag">inputs: <code>{{ step.inputs | tojson }}</code></div>
+      <div class="tag">expected: {{ step.expected_output }}</div>
+    </li>
+    {% endfor %}
+  </ol>
+  <p class="tag">Nothing has run — this is the plan only.</p>
+</div>

@@ -1,8 +1,8 @@
-"""`make seed` — build the registry and load sample goals, then report.
+"""`make seed` / `make reset` — initialize storage, register the demo tools,
+and load sample goals, then report.
 
-Phase 1 has no database yet, so seeding registers the demo tools (proving the
-allowlist and schema validation) and validates the sample goals file. Run-state
-clearing is added with persistence in a later phase.
+  python -m app.seed            initialize DB (if needed), register, validate
+  python -m app.seed --reset    drop run-state first for a clean demo
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import sys
 
+from app import store
 from app.paths import SEED_GOALS
 from app.registry import build_registry
 
@@ -27,9 +28,15 @@ def load_goals() -> list[dict]:
     return goals
 
 
-def main() -> int:
-    registry = build_registry()
+def main(argv: list[str]) -> int:
+    reset = "--reset" in argv
+    if reset:
+        store.reset_db()
+        print("Run-state cleared.")
+    else:
+        store.init_db()
 
+    registry = build_registry()
     print("Registered tools (allowlist):")
     for spec in registry.specs():
         flag = "  [consequential]" if spec["consequential"] else ""
@@ -41,9 +48,9 @@ def main() -> int:
     for goal in goals:
         print(f"  - {goal['id']}: {goal['question']}")
 
-    print("\nSeed complete: tools registered, goals validated.")
+    print("\nSeed complete: storage ready, tools registered, goals validated.")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))
