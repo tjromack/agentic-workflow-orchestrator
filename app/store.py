@@ -32,9 +32,35 @@ CREATE TABLE IF NOT EXISTS plans (
     steps_json      TEXT NOT NULL,
     created_at      TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS steps (
+    id          TEXT PRIMARY KEY,        -- "{run_id}:{step_index}"
+    run_id      TEXT NOT NULL REFERENCES runs(id),
+    step_index  INTEGER NOT NULL,
+    tool        TEXT NOT NULL,
+    status      TEXT NOT NULL,
+    attempts    INTEGER NOT NULL DEFAULT 0,
+    inputs_json TEXT,
+    output_json TEXT,
+    error       TEXT,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
+-- The replayable-trace backbone: guardrail events, step lifecycle, and (later)
+-- human decisions. The Phase 5 audit viewer renders this table.
+CREATE TABLE IF NOT EXISTS events (
+    id          TEXT PRIMARY KEY,
+    run_id      TEXT NOT NULL REFERENCES runs(id),
+    step_index  INTEGER,
+    kind        TEXT NOT NULL,
+    message     TEXT NOT NULL,
+    data_json   TEXT,
+    created_at  TEXT NOT NULL
+);
 """
 
-_TABLES = ["plans", "runs"]
+_TABLES = ["events", "steps", "plans", "runs"]
 
 
 def _db_path() -> Path:
@@ -121,4 +147,66 @@ def get_plan_for_run(run_id: str) -> dict[str, Any] | None:
 def list_runs() -> list[dict[str, Any]]:
     with connect() as conn:
         rows = conn.execute("SELECT * FROM runs ORDER BY created_at DESC").fetchall()
+    return [dict(r) for r in rows]
+
+
+def set_run_status(run_id: str, status: str) -> None:
+    with connect() as conn:
+        conn.execute("UPDATE runs SET status = ? WHERE id = ?", (status, run_id))
+
+
+def record_step(
+    run_id: str, step_index: int, tool: str, status: str, *,
+    attempts: int = 0, inputs: Any = None, output: Any = None, error: str | None = None,
+) -> None:
+    """Upsert a step's current state, keyed on (run_id, step_index)."""
+    now = _now()
+    with connect() as conn:
+        conn.execute(
+            """INSERT INTO steps
+               (id, run_id, step_index, tool, status, attempts, inputs_json,
+                output_json, error, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(id) DO UPDATE SET
+                 status=excluded.status, attempts=excluded.attempts,
+                 output_json=excluded.output_json, error=excluded.error,
+                 updated_at=excluded.updated_at""",
+            (
+                f"{run_id}:{step_index}", run_id, step_index, tool, status, attempts,
+                json.dumps(inputs) if inputs is not None else None,
+                json.dumps(output) if output is not None else None,
+                error, now, now,
+            ),
+        )
+
+
+def record_event(
+    run_id: str, kind: str, message: str, *,
+    step_index: int | None = None, data: Any = None,
+) -> None:
+    with connect() as conn:
+        conn.execute(
+            """INSERT INTO events
+               (id, run_id, step_index, kind, message, data_json, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                uuid.uuid4().hex, run_id, step_index, kind, message,
+                json.dumps(data) if data is not None else None, _now(),
+            ),
+        )
+
+
+def get_steps(run_id: str) -> list[dict[str, Any]]:
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM steps WHERE run_id = ? ORDER BY step_index", (run_id,)
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_events(run_id: str) -> list[dict[str, Any]]:
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM events WHERE run_id = ? ORDER BY created_at, id", (run_id,)
+        ).fetchall()
     return [dict(r) for r in rows]

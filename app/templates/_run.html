@@ -1,0 +1,41 @@
+<div class="card">
+  <h2 style="margin-top:0;">Run trace</h2>
+  <p class="tag">run <code>{{ run_id }}</code> · status:
+    <strong>{{ result.status }}</strong> ·
+    model: {{ plan.model_provider }} / {{ plan.model_name }}
+  </p>
+
+  <ol>
+    {% for step in result.steps %}
+    <li style="margin-bottom:.75rem;">
+      <code>{{ step.tool }}</code> —
+      <strong>{{ step.status }}</strong>
+      {% if step.attempts %}<span class="tag">({{ step.attempts }} attempt{{ "s" if step.attempts > 1 }})</span>{% endif %}
+      {% if step.error %}<div class="tag" style="color:#c0392b;">error: {{ step.error }}</div>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+
+  {% if result.status == "awaiting_checkpoint" %}
+  <p class="tag" style="color:#b9770e;">
+    ⚠ Paused at a consequential step — human approval required.
+    (Interactive approve/reject lands in Phase 4.)
+  </p>
+  {% endif %}
+
+  <details {% if result.status != "completed" %}open{% endif %}>
+    <summary class="tag">Guardrail / trace events ({{ result.events|length }})</summary>
+    <ul class="tag">
+      {% for e in result.events %}
+      <li><code>{{ e.kind }}</code>{% if e.step_index %} · step {{ e.step_index }}{% endif %} — {{ e.message }}</li>
+      {% endfor %}
+    </ul>
+  </details>
+
+  {% if result.final_output and result.final_output.brief_markdown %}
+  <details>
+    <summary class="tag">Final brief</summary>
+    <pre style="white-space:pre-wrap;">{{ result.final_output.brief_markdown }}</pre>
+  </details>
+  {% endif %}
+</div>

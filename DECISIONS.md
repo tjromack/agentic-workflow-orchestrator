@@ -66,6 +66,38 @@ These are the script for "why did you build it this way?" Add an entry on every 
 - Why: Auditability is what separates a demo from something operable. It's also the debugging and
   trust mechanism — you can always answer "what did it do and why?"
 
+## 013. Retry-or-halt policy: retry transient errors, halt deterministic ones
+- Phase: 3
+- Decision: The executor retries a step (up to `max_attempts`) only on a generic
+  tool runtime error. A `SchemaValidationError` or a `ToolNotAllowed` halts the run
+  immediately — no retry. A step budget (`max_steps`) caps both plan length and
+  iterations. Every decision emits an explicit event.
+- Alternatives considered: Retry everything uniformly; never retry; retry with
+  backoff/jitter.
+- Why: Retrying a deterministic failure (bad schema, disallowed tool) just burns the
+  budget and produces the same error — those are bugs to surface, not transients to
+  paper over. Retry is reserved for the failures that are plausibly transient (a flaky
+  tool/model call). Halting loudly is the safe default for a guarded engine.
+- Tradeoff accepted: A genuinely transient validation blip won't be retried; acceptable
+  because tool outputs here are deterministic. Revisit if tools become nondeterministic.
+
+## 014. Checkpoints are a pause-by-default seam driven by an approvals map
+- Phase: 3 (made interactive in Phase 4)
+- Decision: A consequential step pauses the run (`awaiting_checkpoint`) and returns
+  unless an explicit approval for that step index is supplied. Approvals are a simple
+  `{step_index: bool}` map the executor already honors; Phase 4 just populates it from
+  the UI and resumes from persisted state. Run state (steps + events) persists to
+  SQLite so a paused run is resumable. The CLI auto-approves to demonstrate full
+  end-to-end execution.
+- Alternatives considered: Run consequential steps and undo on rejection; a callback
+  interface; auto-approve in the web app for the Phase 3 gate.
+- Why: Pausing *before* the effect honors the contract ("never run consequential steps
+  without approval") with no compensating logic, and the approvals-map seam means the
+  interactive gate in Phase 4 is additive, not a rewrite. Persisting steps/events now
+  doubles as the audit-trace backbone the Phase 5 viewer renders.
+- Tradeoff accepted: "End to end" in the web app means *up to the checkpoint* by
+  default; the full chain is shown via the CLI/tests that pass approvals.
+
 ## 011. Provider abstraction with a deterministic planner fallback
 - Phase: 2
 - Decision: A tiny `Provider` interface (`complete(system, user) -> str`) backs the

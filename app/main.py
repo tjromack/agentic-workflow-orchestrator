@@ -15,6 +15,7 @@ from fastapi.templating import Jinja2Templates
 
 from app import store
 from app.config import load_settings
+from app.executor import Executor
 from app.paths import SEED_GOALS
 from app.planner import build_plan
 from app.providers import make_provider
@@ -73,4 +74,22 @@ def plan(request: Request, goal: str = Form(...)) -> HTMLResponse:
         request,
         "_plan.html",
         {"run_id": run_id, "plan": plan_obj},
+    )
+
+
+@app.post("/run", response_class=HTMLResponse)
+def run(request: Request, goal: str = Form(...)) -> HTMLResponse:
+    """Plan, persist, then execute under guardrails (pausing at checkpoints)."""
+    provider = make_provider(_settings)
+    plan_obj = build_plan(goal, _registry, provider)
+
+    run_id = store.create_run(goal)
+    store.save_plan(run_id, plan_obj)
+
+    result = Executor(_registry).run(run_id, plan_obj)
+
+    return templates.TemplateResponse(
+        request,
+        "_run.html",
+        {"run_id": run_id, "plan": plan_obj, "result": result},
     )
