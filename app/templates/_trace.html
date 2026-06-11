@@ -1,0 +1,66 @@
+{# Shared run-trace body. Expects `trace` (see app.audit.get_trace). #}
+{% set run = trace.run %}
+<div class="card">
+  <h2 style="margin-top:0;">Run trace</h2>
+  <p class="tag">
+    run <a href="/runs/{{ run.id }}"><code>{{ run.id }}</code></a> ·
+    status: <strong>{{ run.status }}</strong>
+    {% if trace.timings.total_ms is not none %} · {{ trace.timings.total_ms }} ms total{% endif %} ·
+    <a href="/runs/{{ run.id }}/trace.json">trace.json</a>
+  </p>
+  <p><em>{{ run.goal }}</em></p>
+
+  <ol>
+    {% for step in trace.steps %}
+    <li style="margin-bottom:.7rem;">
+      <code>{{ step.tool }}</code> — <strong>{{ step.status }}</strong>
+      {% if step.consequential %}<span class="tag" style="color:#b9770e;">consequential</span>{% endif %}
+      {% if step.attempts %}<span class="tag">({{ step.attempts }} attempt{{ "s" if step.attempts > 1 }}{% if step.duration_ms is not none %}, {{ step.duration_ms }} ms{% endif %})</span>{% endif %}
+      <div class="tag">{{ step.description }}</div>
+      {% if step.resolved_inputs is not none %}
+      <details><summary class="tag">inputs</summary>
+        <pre style="white-space:pre-wrap;">{{ step.resolved_inputs | tojson(indent=2) }}</pre></details>
+      {% endif %}
+      {% if step.output is not none %}
+      <details><summary class="tag">output</summary>
+        <pre style="white-space:pre-wrap;">{{ step.output | tojson(indent=2) }}</pre></details>
+      {% endif %}
+      {% if step.error %}<div class="tag" style="color:#c0392b;">error: {{ step.error }}</div>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+
+  {% if trace.pending_index %}
+  <div class="card" style="border-color:#b9770e;">
+    <p style="margin-top:0;"><strong>⚠ Human checkpoint — step {{ trace.pending_index }} is consequential.</strong>
+      Nothing further runs until you decide.</p>
+    <form hx-post="/resume" hx-target="#plan" hx-swap="innerHTML" hx-disabled-elt="button">
+      <input type="hidden" name="run_id" value="{{ run.id }}" />
+      <button type="submit" name="decision" value="approve">Approve &amp; continue</button>
+      <button type="submit" name="decision" value="reject">Reject</button>
+    </form>
+  </div>
+  {% endif %}
+
+  {% if trace.decisions %}
+  <p class="tag">Human decisions:
+    {% for d in trace.decisions %}<code>{{ d.data.decision }}</code> (step {{ d.step_index }}){% if not loop.last %}, {% endif %}{% endfor %}
+  </p>
+  {% endif %}
+
+  <details {% if run.status != "completed" %}open{% endif %}>
+    <summary class="tag">Audit trace — events ({{ trace.events|length }})</summary>
+    <ul class="tag">
+      {% for e in trace.events %}
+      <li>{% if e.elapsed_ms is not none %}+{{ e.elapsed_ms }} ms · {% endif %}<code>{{ e.kind }}</code>{% if e.step_index %} · step {{ e.step_index }}{% endif %} — {{ e.message }}</li>
+      {% endfor %}
+    </ul>
+  </details>
+
+  {% if trace.brief %}
+  <details open>
+    <summary class="tag">Final brief</summary>
+    <pre style="white-space:pre-wrap;">{{ trace.brief }}</pre>
+  </details>
+  {% endif %}
+</div>

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<p class="tag"><a href="/">&larr; new run</a></p>
+
+<div class="card">
+  <h2 style="margin-top:0;">Audit log — runs</h2>
+  {% if runs %}
+  <table style="width:100%; border-collapse:collapse;">
+    <thead>
+      <tr class="tag" style="text-align:left;">
+        <th>run</th><th>status</th><th>goal</th><th>created</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in runs %}
+      <tr>
+        <td><a href="/runs/{{ r.id }}"><code>{{ r.id[:8] }}</code></a></td>
+        <td>{{ r.status }}</td>
+        <td>{{ r.goal }}</td>
+        <td class="tag">{{ r.created_at }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="tag">No runs yet. <a href="/">Start one.</a></p>
+  {% endif %}
+</div>
+{% endblock %}

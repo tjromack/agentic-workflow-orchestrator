@@ -42,6 +42,7 @@ class RunStatus:
 
 class StepStatus:
     PENDING = "pending"
+    RUNNING = "running"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     HALTED = "halted"
@@ -249,6 +250,8 @@ class Executor:
                 run_id, events, Event.STEP_STARTED,
                 f"Running step {step.index}: {step.tool}.", step_index=step.index,
             )
+            sr.status = StepStatus.RUNNING
+            self._step(run_id, sr)  # stamp start time for duration
 
             # Execute with retry-or-halt.
             halted = self._execute_step(run_id, step, resolved, sr, outputs, events)

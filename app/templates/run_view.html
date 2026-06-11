@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block content %}
+<p class="tag"><a href="/runs">&larr; all runs</a> · <a href="/">new run</a></p>
+
+<div class="card">
+  <p class="tag">
+    plan model: {{ trace.plan.model_provider }} / {{ trace.plan.model_name }} ·
+    prompt: {{ trace.plan.prompt_version }} ·
+    started {{ trace.timings.started_at }}
+  </p>
+</div>
+
+{% include "_trace.html" %}
+{% endblock %}

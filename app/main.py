@@ -13,7 +13,7 @@ from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
-from app import checkpoints, store
+from app import audit, checkpoints, store
 from app.config import load_settings
 from app.executor import Executor
 from app.paths import SEED_GOALS
@@ -43,24 +43,10 @@ def _seed_goals() -> list[dict]:
     return []
 
 
-def _render_run(request: Request, run_id: str) -> HTMLResponse:
-    """Build the run trace from persisted state and render it."""
-    run = store.get_run(run_id)
-    steps = store.get_steps(run_id)
-    brief = None
-    for s in steps:
-        if s["tool"] == "write_brief" and s["status"] == "succeeded" and s["output_json"]:
-            brief = json.loads(s["output_json"]).get("brief_markdown")
+def _render_trace(request: Request, run_id: str) -> HTMLResponse:
+    """Render the live run partial from the assembled audit trace."""
     return templates.TemplateResponse(
-        request,
-        "_run.html",
-        {
-            "run": run,
-            "steps": steps,
-            "events": store.get_events(run_id),
-            "pending_index": checkpoints.pending_checkpoint(run_id),
-            "brief": brief,
-        },
+        request, "_trace.html", {"trace": audit.get_trace(run_id)}
     )
 
 
@@ -108,7 +94,7 @@ def run(request: Request, goal: str = Form(...)) -> HTMLResponse:
     store.save_plan(run_id, plan_obj)
 
     Executor(_registry).run(run_id, plan_obj)
-    return _render_run(request, run_id)
+    return _render_trace(request, run_id)
 
 
 @app.post("/resume", response_class=HTMLResponse)
@@ -117,4 +103,33 @@ def resume(
 ) -> HTMLResponse:
     """Record the human decision and resume (approve) or halt (reject)."""
     checkpoints.resume(_registry, run_id, decision)
-    return _render_run(request, run_id)
+    return _render_trace(request, run_id)
+
+
+@app.get("/runs", response_class=HTMLResponse)
+def runs_list(request: Request) -> HTMLResponse:
+    """The audit log: every run, inspectable after the fact."""
+    return templates.TemplateResponse(
+        request, "runs_list.html",
+        {"title": "Runs — audit log", "runs": audit.list_runs()},
+    )
+
+
+@app.get("/runs/{run_id}", response_class=HTMLResponse)
+def run_view(request: Request, run_id: str) -> HTMLResponse:
+    """Full viewer for a single run, reconstructed from the audit log."""
+    trace = audit.get_trace(run_id)
+    if trace is None:
+        return HTMLResponse("Run not found", status_code=404)
+    return templates.TemplateResponse(
+        request, "run_view.html", {"title": "Run viewer", "trace": trace}
+    )
+
+
+@app.get("/runs/{run_id}/trace.json")
+def run_trace_json(run_id: str) -> JSONResponse:
+    """The machine-replayable trace artifact."""
+    trace = audit.get_trace(run_id)
+    if trace is None:
+        return JSONResponse({"error": "run not found"}, status_code=404)
+    return JSONResponse(trace)

@@ -117,6 +117,23 @@ These are the script for "why did you build it this way?" Add an entry on every 
   fine for deterministic tools, and the schema still re-validates anything re-run.
 - Revisit if: Tools become nondeterministic or outputs expire and must be recomputed.
 
+## 016. Audit is a read-only projection over the persisted tables
+- Phase: 5
+- Decision: `app/audit.get_trace` assembles the full trace (plan + per-step resolved
+  inputs/outputs + events + human decisions + timings) by joining the existing runs,
+  plans, steps, and events tables — it persists nothing new. The same trace backs the
+  HTML viewer (`/runs`, `/runs/{id}`) and a `trace.json` artifact. Step durations come
+  from a `running` row stamped at step start plus the completion update.
+- Alternatives considered: A denormalized audit table written alongside execution; an
+  event-sourcing log as the sole source of truth.
+- Why: The execution path already persists everything needed (Phases 2–4), so a derived
+  read-model avoids dual writes that could drift from what actually ran. "Replayable"
+  here means the trace is fully reconstructable from persisted state — which `trace.json`
+  makes explicit. One assembly function means the live partial and the after-the-fact
+  viewer never disagree.
+- Tradeoff accepted: Assembling the trace on each view is recomputed rather than cached;
+  trivial at demo scale. Revisit with run volume → materialize or paginate.
+
 ## 011. Provider abstraction with a deterministic planner fallback
 - Phase: 2
 - Decision: A tiny `Provider` interface (`complete(system, user) -> str`) backs the
