@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+  <p><strong>Scaffold is live.</strong> This is a general-purpose engine for running
+  multi-step AI workflows safely. The lead demo is a neutral
+  <em>research-to-brief</em> agent.</p>
+  <p>Build status: Phase 0 (scaffold). Coming next:</p>
+  <ul>
+    <li>Phase 1 — MCP-style tool registry (typed schemas + allowlist)</li>
+    <li>Phase 2 — Planner (goal &rarr; inspectable plan)</li>
+    <li>Phase 3 — Executor with guardrails</li>
+    <li>Phase 4 — Human checkpoints</li>
+    <li>Phase 5 — Audit log &amp; run viewer</li>
+    <li>Phase 6 — Research-to-brief demo &amp; polish</li>
+  </ul>
+  <p class="tag">Health check: <code>GET /health</code></p>
+</div>
+{% endblock %}

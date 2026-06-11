@@ -1,0 +1,17 @@
+# Web framework + server
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# Templating (HTMX is loaded client-side via CDN in base.html)
+jinja2==3.1.5
+
+# Schema validation for the typed tool registry
+jsonschema==4.23.0
+
+# LLM planner provider + config
+anthropic==0.42.0
+python-dotenv==1.0.1
+
+# Tests
+pytest==8.3.4
+httpx==0.28.1
