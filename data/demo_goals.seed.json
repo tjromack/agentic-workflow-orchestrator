@@ -1,0 +1,14 @@
+{
+  "goals": [
+    {
+      "id": "goal-green-roofs",
+      "question": "Write a short research brief on the benefits and risks of urban green roofs.",
+      "suggested_k": 5
+    },
+    {
+      "id": "goal-community-solar",
+      "question": "Summarize the current state of community solar programs for a policy brief.",
+      "suggested_k": 5
+    }
+  ]
+}

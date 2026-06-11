@@ -66,6 +66,37 @@ These are the script for "why did you build it this way?" Add an entry on every 
 - Why: Auditability is what separates a demo from something operable. It's also the debugging and
   trust mechanism — you can always answer "what did it do and why?"
 
+## 009. JSON Schema (Draft 2020-12) validated in the registry's call path
+- Phase: 1
+- Decision: Tools declare plain JSON Schema for input and output; `registry.call`
+  is the single entry point and validates both sides on every call. Schemas are
+  checked for validity at registration time, not first use.
+- Alternatives considered: Pydantic models per tool; validating only in the
+  executor (Phase 3).
+- Why: JSON Schema is the MCP-aligned, language-agnostic contract — the *same*
+  object validates a call and is handed to the planner (`registry.specs()`) as the
+  description of what the tool accepts. Validating in the registry makes the call
+  path itself the enforcement boundary, so nothing can call a tool incorrectly even
+  outside the executor. The executor (Phase 3) layers budgets/retries on top.
+- Tradeoff accepted: Less ergonomic than Pydantic for Python authors; worth it for
+  a serializable, planner-visible, transport-neutral contract.
+- Revisit if: We need richer cross-field validation than JSON Schema expresses.
+
+## 010. Deterministic local corpus + deterministic tool stubs
+- Phase: 1
+- Decision: `retrieve_documents` searches a bundled synthetic corpus
+  (`data/corpus/documents.json`); `summarize_sources` and `write_brief` ship as
+  deterministic implementations that run with no API key. The schema is the
+  contract, so an LLM-backed handler can replace either later without changing
+  callers.
+- Alternatives considered: Live web search; requiring an API key for the demo.
+- Why: Repeatable, offline, cold-start demos — `make reset` always reproduces the
+  same run — and it honors "synthetic/public data only." Decouples the registry
+  gate from model availability.
+- Tradeoff accepted: Stub summaries are mechanical, not "smart," until the LLM path
+  lands (Phase 2 provider abstraction).
+- Revisit if: The demo needs genuinely model-written summaries by default.
+
 ## 007. Synthetic/public data + local-model option
 - Phase: 1/2
 - Decision: Demo tools use public/synthetic data; the planner can run on a local model via Ollama.

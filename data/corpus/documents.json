@@ -1,0 +1,66 @@
+[
+  {
+    "id": "doc-greenroof-01",
+    "title": "Urban Green Roofs Cut Building Cooling Loads",
+    "source": "Synthetic Urban Systems Review",
+    "url": "https://example.org/synthetic/green-roofs-cooling",
+    "topic": "urban green roofs",
+    "text": "Green roofs add a layer of soil and vegetation on top of a building, which shades the roof membrane and cools the air through evapotranspiration. Field measurements in temperate cities show summer cooling-load reductions of roughly 15 to 25 percent for the top floor. The effect is largest on older buildings with poor insulation. Savings shrink in well-insulated new construction, where the roof is already a minor heat path."
+  },
+  {
+    "id": "doc-greenroof-02",
+    "title": "Stormwater Retention Benefits of Vegetated Roofs",
+    "source": "Synthetic Water & Cities Journal",
+    "url": "https://example.org/synthetic/green-roofs-stormwater",
+    "topic": "urban green roofs",
+    "text": "A vegetated roof absorbs rainfall in its growing medium and releases it slowly, reducing peak stormwater runoff into combined sewers. Studies report retention of 40 to 60 percent of annual rainfall depending on substrate depth. This eases pressure on aging drainage infrastructure during heavy storms. Cities with combined sewer overflows have used green-roof incentives as one tool to reduce untreated discharge."
+  },
+  {
+    "id": "doc-greenroof-03",
+    "title": "Structural and Maintenance Costs of Green Roofs",
+    "source": "Synthetic Building Economics Quarterly",
+    "url": "https://example.org/synthetic/green-roofs-costs",
+    "topic": "urban green roofs",
+    "text": "Green roofs raise upfront cost because the structure must carry the added weight of saturated soil, and waterproofing must be more robust. Installed costs commonly run two to three times that of a conventional roof. Maintenance includes irrigation in dry spells, weeding, and periodic drainage inspection. Poorly maintained installations can fail, leading to leaks that are expensive to locate under the planting."
+  },
+  {
+    "id": "doc-greenroof-04",
+    "title": "Green Roofs and Urban Biodiversity",
+    "source": "Synthetic Ecology Letters (Demo)",
+    "url": "https://example.org/synthetic/green-roofs-biodiversity",
+    "topic": "urban green roofs",
+    "text": "Even shallow green roofs provide habitat for pollinators and ground-nesting birds in dense neighborhoods that otherwise lack vegetation. Species diversity rises when native, drought-tolerant plants are used instead of a single sedum mat. Connectivity matters: isolated roofs help less than networks of nearby green spaces. Biodiversity gains are real but modest compared with ground-level parks of the same area."
+  },
+  {
+    "id": "doc-solar-01",
+    "title": "How Community Solar Programs Work",
+    "source": "Synthetic Energy Policy Brief",
+    "url": "https://example.org/synthetic/community-solar-basics",
+    "topic": "community solar programs",
+    "text": "Community solar lets households subscribe to a share of a shared solar array instead of installing panels on their own roof. Subscribers receive credits on their utility bill proportional to the energy their share produces. The model opens solar access to renters and to buildings with shaded or unsuitable roofs. Programs are typically enabled by state legislation that requires utilities to apply the bill credits."
+  },
+  {
+    "id": "doc-solar-02",
+    "title": "Equity Goals in Community Solar Design",
+    "source": "Synthetic Energy Policy Brief",
+    "url": "https://example.org/synthetic/community-solar-equity",
+    "topic": "community solar programs",
+    "text": "Many state programs reserve a portion of subscriptions for low- and moderate-income households to spread the benefits of clean energy. Carve-outs of 30 to 50 percent are common in newer programs. Without such rules, early subscribers skew toward higher-income homeowners who are easier to enroll. Outreach through trusted community organizations measurably improves low-income participation."
+  },
+  {
+    "id": "doc-solar-03",
+    "title": "Barriers to Community Solar Adoption",
+    "source": "Synthetic Grid Quarterly (Demo)",
+    "url": "https://example.org/synthetic/community-solar-barriers",
+    "topic": "community solar programs",
+    "text": "Complex subscription contracts and unclear cancellation terms have slowed enrollment in several markets. Utilities sometimes resist because bill-credit accounting is administratively heavy. Interconnection queues can delay projects for years before any subscriber sees a credit. Standardized contracts and consolidated billing are the most cited fixes for these adoption barriers."
+  },
+  {
+    "id": "doc-solar-04",
+    "title": "Measured Savings for Community Solar Subscribers",
+    "source": "Synthetic Energy Economics Review",
+    "url": "https://example.org/synthetic/community-solar-savings",
+    "topic": "community solar programs",
+    "text": "Typical subscribers save between 5 and 15 percent on the energy portion of their bill, with the exact figure set by program rules and local electricity prices. Savings are modest per household but require no upfront cost when subscriptions are free to join and cancel. The clearest financial wins appear in states with high retail electricity rates. Where rates are low, the bill credit may barely exceed any subscription fee."
+  }
+]

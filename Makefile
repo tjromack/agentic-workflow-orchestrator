@@ -14,8 +14,8 @@ install:        ## Create venv + install dependencies
 	$(PY) -m pip install --upgrade pip
 	$(PY) -m pip install -r requirements.txt
 
-seed:           ## Register demo tools + sample goals (Phase 1)
-	@echo "seed: implemented in Phase 1 (tool registry + sample goals)."
+seed:           ## Register demo tools + load sample goals
+	$(PY) -m app.seed
 
 run:            ## Start the FastAPI dev server
 	$(PY) -m uvicorn app.main:app --reload
@@ -23,8 +23,9 @@ run:            ## Start the FastAPI dev server
 test:           ## Run the test suite
 	$(PY) -m pytest -q
 
-reset:          ## Clear runs + re-seed for a clean demo (Phase 1+)
-	@echo "reset: implemented in Phase 1 (clear DB + re-seed)."
+reset:          ## Clear runs + re-seed for a clean demo
+	@echo "reset: no run-state to clear yet; re-seeding."
+	$(PY) -m app.seed
 
 fmt:            ## Format code (placeholder until a formatter is wired)
 	@echo "fmt: no formatter configured yet."
