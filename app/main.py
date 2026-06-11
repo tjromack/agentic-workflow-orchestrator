@@ -1,8 +1,8 @@
 """FastAPI application entry point.
 
-Phase 2 adds a planner demo: pose a goal, get an explicit, inspectable plan
-(persisted, with model + prompt version) that references only allowlisted tools.
-Execution/checkpoints/audit-viewer arrive in later phases.
+Pose a goal -> inspectable plan -> guarded stepwise execution -> human checkpoint
+-> persisted, replayable run trace. The trace is always rendered from persisted
+state so /run and /resume show the same, complete picture.
 """
 
 import json
@@ -13,7 +13,7 @@ from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
-from app import store
+from app import checkpoints, store
 from app.config import load_settings
 from app.executor import Executor
 from app.paths import SEED_GOALS
@@ -41,6 +41,27 @@ def _seed_goals() -> list[dict]:
     if SEED_GOALS.exists():
         return json.loads(SEED_GOALS.read_text(encoding="utf-8")).get("goals", [])
     return []
+
+
+def _render_run(request: Request, run_id: str) -> HTMLResponse:
+    """Build the run trace from persisted state and render it."""
+    run = store.get_run(run_id)
+    steps = store.get_steps(run_id)
+    brief = None
+    for s in steps:
+        if s["tool"] == "write_brief" and s["status"] == "succeeded" and s["output_json"]:
+            brief = json.loads(s["output_json"]).get("brief_markdown")
+    return templates.TemplateResponse(
+        request,
+        "_run.html",
+        {
+            "run": run,
+            "steps": steps,
+            "events": store.get_events(run_id),
+            "pending_index": checkpoints.pending_checkpoint(run_id),
+            "brief": brief,
+        },
+    )
 
 
 @app.get("/health")
@@ -86,10 +107,14 @@ def run(request: Request, goal: str = Form(...)) -> HTMLResponse:
     run_id = store.create_run(goal)
     store.save_plan(run_id, plan_obj)
 
-    result = Executor(_registry).run(run_id, plan_obj)
+    Executor(_registry).run(run_id, plan_obj)
+    return _render_run(request, run_id)
 
-    return templates.TemplateResponse(
-        request,
-        "_run.html",
-        {"run_id": run_id, "plan": plan_obj, "result": result},
-    )
+
+@app.post("/resume", response_class=HTMLResponse)
+def resume(
+    request: Request, run_id: str = Form(...), decision: str = Form(...)
+) -> HTMLResponse:
+    """Record the human decision and resume (approve) or halt (reject)."""
+    checkpoints.resume(_registry, run_id, decision)
+    return _render_run(request, run_id)

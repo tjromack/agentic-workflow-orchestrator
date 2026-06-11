@@ -60,6 +60,7 @@ class Event:
     TOOL_ERROR = "tool_error"
     BUDGET_EXCEEDED = "budget_exceeded"
     CHECKPOINT_REQUIRED = "checkpoint_required"
+    HUMAN_DECISION = "human_decision"
     REJECTED = "rejected"
     RUN_COMPLETED = "run_completed"
 
@@ -163,12 +164,15 @@ class Executor:
     # -- main loop ---------------------------------------------------------- #
 
     def run(
-        self, run_id: str, plan: Plan, approvals: dict[int, bool] | None = None
+        self, run_id: str, plan: Plan, approvals: dict[int, bool] | None = None,
+        prior_outputs: dict[int, dict[str, Any]] | None = None,
     ) -> RunResult:
         approvals = approvals or {}
         events: list[GuardrailEvent] = []
         steps: list[StepResult] = []
-        outputs: dict[int, dict[str, Any]] = {}
+        # Resume support: outputs from already-completed steps are carried in.
+        outputs: dict[int, dict[str, Any]] = dict(prior_outputs or {})
+        completed = set(outputs)
 
         self._status(run_id, RunStatus.RUNNING)
 
@@ -181,6 +185,13 @@ class Executor:
             return RunResult(run_id, RunStatus.HALTED, steps, events, outputs)
 
         for iteration, step in enumerate(plan.steps, start=1):
+            if step.index in completed:  # already ran in a prior segment — carry forward
+                steps.append(StepResult(
+                    step.index, step.tool, StepStatus.SUCCEEDED,
+                    output=outputs[step.index],
+                ))
+                continue
+
             if iteration > self.max_steps:  # iteration budget backstop
                 self._event(
                     run_id, events, Event.BUDGET_EXCEEDED,

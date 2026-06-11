@@ -98,6 +98,25 @@ These are the script for "why did you build it this way?" Add an entry on every 
 - Tradeoff accepted: "End to end" in the web app means *up to the checkpoint* by
   default; the full chain is shown via the CLI/tests that pass approvals.
 
+## 015. Resume by carrying persisted outputs forward; decision is an audit event
+- Phase: 4
+- Decision: Resuming a paused run reconstructs the plan + already-succeeded step
+  outputs from SQLite and re-invokes the executor with `prior_outputs` (carried,
+  not re-run) plus an approval for the pending step. The human decision is written
+  to the same `events` trace (`human_decision`) before execution resumes; rejection
+  halts the run with the step marked `rejected`. The run trace is always rendered
+  from persisted state, so `/run` and `/resume` show one complete picture.
+- Alternatives considered: Re-run the whole plan on resume; keep the paused run in
+  memory; run the consequential step and compensate on rejection; a separate
+  decisions table.
+- Why: Carrying outputs forward makes resume cheap and idempotent and means a paused
+  run survives a restart (state is in the DB, not memory). Recording the decision in
+  the existing event trace keeps the audit single-sourced and replayable. Rendering
+  from persisted state is the same read path the Phase 5 viewer will use.
+- Tradeoff accepted: Resume trusts persisted outputs rather than recomputing them;
+  fine for deterministic tools, and the schema still re-validates anything re-run.
+- Revisit if: Tools become nondeterministic or outputs expire and must be recomputed.
+
 ## 011. Provider abstraction with a deterministic planner fallback
 - Phase: 2
 - Decision: A tiny `Provider` interface (`complete(system, user) -> str`) backs the
