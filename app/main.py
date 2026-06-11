@@ -14,10 +14,11 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from app import audit, checkpoints, store
+from app.checkpoints import CheckpointError
 from app.config import load_settings
 from app.executor import Executor
 from app.paths import SEED_GOALS
-from app.planner import build_plan
+from app.planner import PlannerError, build_plan
 from app.providers import make_provider
 from app.registry import build_registry
 
@@ -50,6 +51,11 @@ def _render_trace(request: Request, run_id: str) -> HTMLResponse:
     )
 
 
+def _error(request: Request, message: str) -> HTMLResponse:
+    """Render a friendly error card into the HTMX target (status 200 so it swaps)."""
+    return templates.TemplateResponse(request, "_error.html", {"message": message})
+
+
 @app.get("/health")
 def health() -> JSONResponse:
     return JSONResponse({"status": "ok"})
@@ -69,10 +75,12 @@ def index(request: Request) -> HTMLResponse:
 
 
 @app.post("/plan", response_class=HTMLResponse)
-def plan(request: Request, goal: str = Form(...)) -> HTMLResponse:
+def plan(request: Request, goal: str = Form("")) -> HTMLResponse:
     """Produce, persist, and render an inspectable plan for a goal."""
-    provider = make_provider(_settings)
-    plan_obj = build_plan(goal, _registry, provider)
+    try:
+        plan_obj = build_plan(goal, _registry, make_provider(_settings))
+    except PlannerError as exc:
+        return _error(request, str(exc))
 
     run_id = store.create_run(goal)
     store.save_plan(run_id, plan_obj)
@@ -85,10 +93,12 @@ def plan(request: Request, goal: str = Form(...)) -> HTMLResponse:
 
 
 @app.post("/run", response_class=HTMLResponse)
-def run(request: Request, goal: str = Form(...)) -> HTMLResponse:
+def run(request: Request, goal: str = Form("")) -> HTMLResponse:
     """Plan, persist, then execute under guardrails (pausing at checkpoints)."""
-    provider = make_provider(_settings)
-    plan_obj = build_plan(goal, _registry, provider)
+    try:
+        plan_obj = build_plan(goal, _registry, make_provider(_settings))
+    except PlannerError as exc:
+        return _error(request, str(exc))
 
     run_id = store.create_run(goal)
     store.save_plan(run_id, plan_obj)
@@ -102,7 +112,10 @@ def resume(
     request: Request, run_id: str = Form(...), decision: str = Form(...)
 ) -> HTMLResponse:
     """Record the human decision and resume (approve) or halt (reject)."""
-    checkpoints.resume(_registry, run_id, decision)
+    try:
+        checkpoints.resume(_registry, run_id, decision)
+    except CheckpointError as exc:
+        return _error(request, str(exc))
     return _render_trace(request, run_id)
 
 

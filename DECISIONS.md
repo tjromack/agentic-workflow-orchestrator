@@ -134,6 +134,23 @@ These are the script for "why did you build it this way?" Add an entry on every 
 - Tradeoff accepted: Assembling the trace on each view is recomputed rather than cached;
   trivial at demo scale. Revisit with run volume → materialize or paginate.
 
+## 017. Stopword-filtered retrieval; empty results are a guardrail, not a fallback
+- Phase: 6
+- Decision: `retrieve_documents` filters function/instruction words ("write a brief
+  on…") before matching, scoring documents by the fraction of *content* query terms
+  they cover. An off-corpus query therefore returns zero documents, and the empty
+  result is caught by the next step's input schema (which requires ≥1 document) —
+  the run halts with a `validation_failure` rather than summarizing nothing.
+- Alternatives considered: Keep naive token overlap (matched on "a"/"on"/"the", so
+  every query "found" sources); have retrieve fabricate a placeholder on no match;
+  special-case empty results in the executor.
+- Why: Naive overlap made retrieval meaningless and made it impossible to demo a
+  guardrail trip. Letting the schema boundary catch the empty hand-off keeps the
+  failure in the deterministic guardrail layer (Decision 004) instead of adding
+  bespoke logic — the engine's own validation is the safety net, which is the point.
+- Tradeoff accepted: The stopword list is hand-maintained and English-only; fine for
+  a synthetic-corpus demo. Revisit with real retrieval (embeddings/BM25).
+
 ## 011. Provider abstraction with a deterministic planner fallback
 - Phase: 2
 - Decision: A tiny `Provider` interface (`complete(system, user) -> str`) backs the

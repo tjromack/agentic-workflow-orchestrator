@@ -112,4 +112,7 @@ DECISIONS.md  DEMO.md  TODO.md  CLAUDE.md
 
 ## Status
 
-In development. See `TODO.md` for the phased plan.
+All phases shipped (0–6): tool registry, planner, guarded executor, human
+checkpoints, audit log + run viewer, and the research-to-brief demo. The full
+demo runs cold from `make reset`; see `DEMO.md` for the walkthrough and `TODO.md`
+for the phased plan.

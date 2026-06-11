@@ -16,6 +16,17 @@ from app.registry import Tool
 
 _WORD = re.compile(r"[a-z0-9]+")
 
+# Function words + research-instruction noise. Filtering these keeps retrieval on
+# the content terms of a goal ("urban green roofs") rather than matching on "write
+# a brief on the…", and lets a genuinely off-corpus query return zero documents.
+_STOPWORDS = {
+    "a", "an", "the", "of", "on", "in", "to", "for", "and", "or", "is", "are",
+    "be", "with", "about", "into", "from", "as", "at", "by", "this", "that",
+    "write", "writing", "brief", "summarize", "summary", "research", "report",
+    "short", "current", "state", "give", "me", "please", "produce", "draft",
+    "overview", "note", "create",
+}
+
 INPUT_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -69,16 +80,18 @@ def _snippet(text: str, limit: int = 280) -> str:
 
 
 def _handler(inputs: dict[str, Any]) -> dict[str, Any]:
-    query_terms = set(_tokens(inputs["query"]))
+    query_terms = {t for t in _tokens(inputs["query"]) if t not in _STOPWORDS}
     k = inputs.get("k", 5)
+    if not query_terms:  # nothing meaningful to search for
+        return {"documents": []}
 
     scored: list[tuple[float, dict[str, Any]]] = []
     for doc in _load_corpus():
-        haystack = _tokens(f"{doc['title']} {doc['text']} {doc['topic']}")
-        overlap = sum(1 for t in haystack if t in query_terms)
-        if overlap == 0:
+        haystack = set(_tokens(f"{doc['title']} {doc['text']} {doc['topic']}"))
+        matched = query_terms & haystack
+        if not matched:
             continue
-        score = overlap / len(haystack)  # length-normalized term frequency
+        score = len(matched) / len(query_terms)  # fraction of the query covered
         scored.append((score, doc))
 
     scored.sort(key=lambda pair: pair[0], reverse=True)

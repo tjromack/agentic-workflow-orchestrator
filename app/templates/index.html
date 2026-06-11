@@ -8,7 +8,7 @@
   you can see it. (Execution lands in a later phase.)</p>
 
   <form hx-target="#plan" hx-swap="innerHTML" hx-disabled-elt="button">
-    <textarea name="goal" rows="2" style="width:100%; box-sizing:border-box;"
+    <textarea name="goal" rows="2" required style="width:100%; box-sizing:border-box;"
               placeholder="e.g. Write a short research brief on urban green roofs.">{{ goals[0].question if goals else "" }}</textarea>
     <div style="margin-top:.5rem;">
       <button type="submit" hx-post="/plan">Plan it</button>
