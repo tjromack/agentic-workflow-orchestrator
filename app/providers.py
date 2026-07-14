@@ -11,7 +11,12 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
+import truststore
 from app.config import Settings
+
+# Use the OS certificate store so live Anthropic calls work behind a TLS-intercepting
+# proxy / custom CA. Injected at import time. (Consistent with the RAG copilot + console.)
+truststore.inject_into_ssl()
 
 
 @runtime_checkable

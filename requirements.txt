@@ -13,6 +13,7 @@ jsonschema==4.23.0
 
 # LLM planner provider + config
 anthropic==0.42.0
+truststore==0.10.4   # OS cert store — live calls work behind a TLS-intercepting proxy
 python-dotenv==1.0.1
 
 # Tests
