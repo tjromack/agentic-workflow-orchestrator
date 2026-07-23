@@ -184,6 +184,48 @@ def _validate_refs(steps: list[PlanStep], registry: ToolRegistry) -> None:
         seen[step.index] = step.tool
 
 
+def _validate_no_dead_branches(
+    steps: list[PlanStep], *, allow_dead_branches: bool = False
+) -> None:
+    """Reject plans with an orphaned step — the 2026-07-18 *silent* failure (Goal 2).
+
+    A dead branch is a step whose output no later step consumes and which isn't the
+    plan's final result — it runs, costs a model call, and is silently discarded. Seen
+    live on 2026-07-23 (run ec1fb0c5): the planner summarised the 'risks' documents into
+    step 4, then wrote the brief from step 3 only, throwing step 4 away.
+
+    Exemptions, because "unconsumed output" is only *waste* for a pure transform:
+      - the **terminal step** (highest index) *is* the run's result (executor.final_output);
+      - a **consequential step** is an action whose side-effect is the point, so its
+        return value need not be consumed.
+
+    Rejects by default; ``allow_dead_branches=True`` is the deliberate override for the
+    rare legitimate case (e.g. a fan-out where a leaf's effect is intended).
+    """
+    if allow_dead_branches or not steps:
+        return
+    consumed: set[int] = set()
+    for step in steps:
+        for value in step.inputs.values():
+            for ref, _ in _walk_refs(value, {}):
+                m = _REF_RE.fullmatch(str(ref))
+                if m:
+                    consumed.add(int(m.group(1)))
+    terminal = max(s.index for s in steps)
+    dead = [
+        s.index
+        for s in steps
+        if s.index != terminal and not s.consequential and s.index not in consumed
+    ]
+    if dead:
+        raise PlannerError(
+            f"Plan has a dead branch: step(s) {dead} produce output that no later step "
+            f"uses and that isn't the final result — they would run and be discarded. "
+            f"Rewrite the plan so their output is consumed, or drop the step. "
+            f"(Pass allow_dead_branches=True to run it anyway.)"
+        )
+
+
 # --------------------------------------------------------------------------- #
 # Deterministic planner — canonical research-to-brief plan
 # --------------------------------------------------------------------------- #
@@ -286,12 +328,19 @@ def _llm_steps(goal: str, registry: ToolRegistry, provider: Provider) -> list[Pl
 # --------------------------------------------------------------------------- #
 
 def build_plan(
-    goal: str, registry: ToolRegistry, provider: Provider | None = None
+    goal: str,
+    registry: ToolRegistry,
+    provider: Provider | None = None,
+    *,
+    allow_dead_branches: bool = False,
 ) -> Plan:
     """Produce a validated plan for ``goal`` using only allowlisted tools.
 
     With no provider, or if the provider fails, falls back to the deterministic
     plan so the demo always produces something inspectable.
+
+    ``allow_dead_branches`` overrides the orphaned-step rejection (see
+    ``_validate_no_dead_branches``) for the rare case where an unconsumed leaf is intended.
     """
     goal = goal.strip()
     if not goal:
@@ -311,6 +360,7 @@ def build_plan(
 
     _validate_against_registry(steps, registry)
     _validate_refs(steps, registry)
+    _validate_no_dead_branches(steps, allow_dead_branches=allow_dead_branches)
     return Plan(
         goal=goal,
         steps=steps,
