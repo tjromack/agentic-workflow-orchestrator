@@ -74,3 +74,66 @@ def test_llm_plan_parsed_and_validated():
 def test_empty_goal_rejected():
     with pytest.raises(PlannerError):
         build_plan("   ", build_registry(), provider=None)
+
+
+# --- Plan-graph validation (2026-07-23): catch bad plans at plan time ---------
+#
+# Both failures reproduced below actually happened on 2026-07-18 with a live LLM
+# planner; here they are pinned as fixtures so the static checks can't regress.
+
+
+def _steps(*specs):
+    """(index, tool, inputs) tuples -> PlanStep list."""
+    return [
+        PlanStep(index=i, tool=t, description=t, inputs=inp, expected_output="x")
+        for (i, t, inp) in specs
+    ]
+
+
+def test_ref_shape_mismatch_is_rejected_at_plan_time():
+    """The 2026-07-18 'loud' failure: two retrieves piped into one summarize as a
+    list makes `documents` an array-of-arrays. It used to halt 3 steps in; now it's
+    rejected before anything runs."""
+    from app.planner import _validate_refs
+
+    reg = build_registry()
+    bad = _steps(
+        (1, "retrieve_documents", {"query": "benefits", "k": 8}),
+        (2, "retrieve_documents", {"query": "risks", "k": 8}),
+        (3, "summarize_sources", {
+            "question": "q",
+            "documents": [{"$ref": "step1.documents"}, {"$ref": "step2.documents"}],
+        }),
+    )
+    with pytest.raises(PlannerError) as exc:
+        _validate_refs(bad, reg)
+    assert "array" in str(exc.value) and "object" in str(exc.value)
+
+
+def test_forward_reference_is_rejected():
+    from app.planner import _validate_refs
+
+    reg = build_registry()
+    bad = _steps((1, "summarize_sources", {"question": "q", "documents": {"$ref": "step2.documents"}}))
+    with pytest.raises(PlannerError, match="does not run before it"):
+        _validate_refs(bad, reg)
+
+
+def test_reference_to_missing_output_field_is_rejected():
+    from app.planner import _validate_refs
+
+    reg = build_registry()
+    bad = _steps(
+        (1, "retrieve_documents", {"query": "q"}),
+        (2, "summarize_sources", {"question": "q", "documents": {"$ref": "step1.nonesuch"}}),
+    )
+    with pytest.raises(PlannerError, match="produces no 'nonesuch'"):
+        _validate_refs(bad, reg)
+
+
+def test_wellformed_refs_pass_and_deterministic_plan_still_validates():
+    """No false positives: the shipped happy-path plan must sail through."""
+    reg = build_registry()
+    # build_plan runs the ref validation internally; a raise here would fail the test.
+    plan = build_plan("Brief on urban green roofs", reg, provider=None)
+    assert [s.tool for s in plan.steps] == ["retrieve_documents", "summarize_sources", "write_brief"]

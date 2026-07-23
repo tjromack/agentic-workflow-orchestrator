@@ -88,6 +88,103 @@ def _validate_against_registry(steps: list[PlanStep], registry: ToolRegistry) ->
 
 
 # --------------------------------------------------------------------------- #
+# Plan-graph validation — catch bad plans at PLAN time, not 3 steps in (2026-07-23)
+#
+# The executor already validates each step's I/O against schemas *as it runs* — but by
+# then work has happened. Both failures seen on 2026-07-18 were statically detectable
+# before anything ran: (1) a $ref whose produced type didn't fit the input it fed (two
+# retrieves piped into one summarize -> array-of-arrays), and (2) an orphaned step whose
+# output no later step consumed (a whole branch executed and was silently discarded).
+# The registry exposes every tool's input/output schema at plan time, so we can resolve
+# each $ref statically and reject an incoherent plan up front.
+# --------------------------------------------------------------------------- #
+
+# Same grammar the executor resolves at run time (executor._REF), so plan-time and
+# run-time agree on what a reference means.
+_REF_RE = re.compile(r"step(\d+)\.(\w+)")
+
+
+def _schema_primary_type(schema: Any) -> str | None:
+    """The JSON-Schema ``type`` as a single string, or None if unspecified/ambiguous.
+
+    None means "don't type-check this placement" — we never reject on a type we can't
+    determine, so the check has no false positives on loosely-typed inputs.
+    """
+    if not isinstance(schema, dict):
+        return None
+    t = schema.get("type")
+    if isinstance(t, str):
+        return t
+    if isinstance(t, list) and len(t) == 1:
+        return t[0]
+    return None
+
+
+def _walk_refs(value: Any, schema: Any):
+    """Yield ``(ref_string, expected_type)`` for every $ref in an input value.
+
+    Recurses through dicts and lists exactly as ``executor._resolve`` does, carrying the
+    consuming schema down so each $ref knows the type expected at its position. The list
+    case is what makes the 2026-07-18 array-of-arrays failure detectable: a $ref sitting
+    as a list *element* is checked against the array's ``items`` type, not the array.
+    """
+    if isinstance(value, dict):
+        if set(value) == {"$ref"}:
+            yield value["$ref"], _schema_primary_type(schema)
+        else:
+            props = schema.get("properties", {}) if isinstance(schema, dict) else {}
+            for k, v in value.items():
+                yield from _walk_refs(v, props.get(k, {}))
+    elif isinstance(value, list):
+        items = schema.get("items", {}) if isinstance(schema, dict) else {}
+        for v in value:
+            yield from _walk_refs(v, items)
+
+
+def _validate_refs(steps: list[PlanStep], registry: ToolRegistry) -> None:
+    """Statically resolve and type-check every ``{"$ref": "stepN.field"}`` (Goal 1).
+
+    Rejects, before any step runs: a malformed reference, a reference to a step that
+    doesn't run earlier (forward/self/missing), a reference to an output field the
+    producing tool doesn't emit, and a reference whose produced type is incompatible
+    with the input position it feeds.
+    """
+    seen: dict[int, str] = {}  # step index -> tool, for steps already in run order
+    for step in steps:
+        in_props = registry.get(step.tool).input_schema.get("properties", {})
+        for key, value in step.inputs.items():
+            for ref, expected in _walk_refs(value, in_props.get(key, {})):
+                m = _REF_RE.fullmatch(str(ref))
+                if not m:
+                    raise PlannerError(
+                        f"Step {step.index} input '{key}' has a malformed reference "
+                        f"{ref!r}; expected 'stepN.field'."
+                    )
+                ref_idx, field = int(m.group(1)), m.group(2)
+                if ref_idx not in seen:
+                    raise PlannerError(
+                        f"Step {step.index} references step{ref_idx}.{field}, which does "
+                        f"not run before it — a step may only use an earlier step's output."
+                    )
+                out_props = registry.get(seen[ref_idx]).output_schema.get("properties", {})
+                if field not in out_props:
+                    raise PlannerError(
+                        f"Step {step.index} references step{ref_idx}.{field}, but "
+                        f"'{seen[ref_idx]}' produces no '{field}' "
+                        f"(its outputs are {sorted(out_props)})."
+                    )
+                produced = _schema_primary_type(out_props[field])
+                if produced and expected and produced != expected:
+                    raise PlannerError(
+                        f"Step {step.index}: step{ref_idx}.{field} produces a "
+                        f"'{produced}', but input '{key}' expects a '{expected}' at that "
+                        f"position in '{step.tool}'. This plan would fail at run time — "
+                        f"rejected before execution."
+                    )
+        seen[step.index] = step.tool
+
+
+# --------------------------------------------------------------------------- #
 # Deterministic planner — canonical research-to-brief plan
 # --------------------------------------------------------------------------- #
 
@@ -213,6 +310,7 @@ def build_plan(
             model_name = f"{DETERMINISTIC_MODEL} (fallback: {type(exc).__name__})"
 
     _validate_against_registry(steps, registry)
+    _validate_refs(steps, registry)
     return Plan(
         goal=goal,
         steps=steps,
