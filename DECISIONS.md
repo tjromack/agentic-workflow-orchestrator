@@ -228,3 +228,17 @@ These are the script for "why did you build it this way?" Add an entry on every 
   generalizes. The real internal tool that uses this pattern is credited under Experience and
   speaks for itself; re-staging it here would read as a clone and muddy the "transferable engine"
   story.
+
+## 018. Retrieval has a relevance floor (not just a term-overlap rank)
+- Decision: `retrieve_documents` excludes any document scoring below a **relevance floor**
+  (`MIN_RELEVANCE = 0.5` of the query's content terms; a plan may override via `min_score`). Previously it
+  ranked by term-overlap and returned the top-k of anything sharing ≥1 term.
+- Why: Ranking without a floor let a k larger than the number of *relevant* documents pull noise into a
+  brief. On 2026-07-18 a `k=8` "urban green roofs" query returned a **community-solar** section — it matched
+  only the shared word "urban" (score 0.33). A floor makes irrelevant documents *absent* rather than merely
+  low-ranked, so an off-topic or thin query returns fewer — or zero — documents. This mirrors, in spirit, the
+  RAG copilot's abstention threshold: below the floor, a "match" is noise. The planner can still widen recall
+  deliberately by passing a lower `min_score`.
+- Rejected: Raising/lowering k per query (k is a count, not a relevance control — the floor is the right
+  knob); a global constant with no override (a plan sometimes *wants* broad recall); re-ranking without
+  filtering (the bug was inclusion, not order). Regression test reproduces the green-roofs/solar case.

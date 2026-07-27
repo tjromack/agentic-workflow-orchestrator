@@ -16,6 +16,13 @@ from app.registry import Tool
 
 _WORD = re.compile(r"[a-z0-9]+")
 
+# Relevance floor: a document must cover at least this fraction of the query's content
+# terms to count as a match. Mirrors the RAG copilot's abstention threshold in spirit —
+# below the floor a document is noise, not a hit. Fixes the 2026-07-18 bug where a k=8
+# over a small corpus pulled a *community-solar* section (matching only the shared word
+# "urban", score 0.33) into a *green-roofs* brief. A plan may override via `min_score`.
+MIN_RELEVANCE = 0.5
+
 # Function words + research-instruction noise. Filtering these keeps retrieval on
 # the content terms of a goal ("urban green roofs") rather than matching on "write
 # a brief on the…", and lets a genuinely off-corpus query return zero documents.
@@ -32,6 +39,7 @@ INPUT_SCHEMA: dict[str, Any] = {
     "properties": {
         "query": {"type": "string", "minLength": 1},
         "k": {"type": "integer", "minimum": 1, "maximum": 20},
+        "min_score": {"type": "number", "minimum": 0, "maximum": 1},
     },
     "required": ["query"],
     "additionalProperties": False,
@@ -82,6 +90,7 @@ def _snippet(text: str, limit: int = 280) -> str:
 def _handler(inputs: dict[str, Any]) -> dict[str, Any]:
     query_terms = {t for t in _tokens(inputs["query"]) if t not in _STOPWORDS}
     k = inputs.get("k", 5)
+    min_score = inputs.get("min_score", MIN_RELEVANCE)
     if not query_terms:  # nothing meaningful to search for
         return {"documents": []}
 
@@ -92,6 +101,8 @@ def _handler(inputs: dict[str, Any]) -> dict[str, Any]:
         if not matched:
             continue
         score = len(matched) / len(query_terms)  # fraction of the query covered
+        if score < min_score:  # relevance floor — below it the document is noise, not a match
+            continue
         scored.append((score, doc))
 
     scored.sort(key=lambda pair: pair[0], reverse=True)
@@ -115,7 +126,9 @@ def get_tool() -> Tool:
         name="retrieve_documents",
         description=(
             "Search a local synthetic corpus and return the top-k most relevant "
-            "documents (id, title, source, url, snippet) for a query."
+            "documents (id, title, source, url, snippet) for a query. Documents below a "
+            "relevance floor (default 0.5 of the query's terms; tune with min_score) are "
+            "excluded, so an off-topic or thin query returns fewer — or zero — documents."
         ),
         input_schema=INPUT_SCHEMA,
         output_schema=OUTPUT_SCHEMA,
