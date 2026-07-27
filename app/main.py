@@ -18,7 +18,7 @@ from app.checkpoints import CheckpointError
 from app.config import load_settings
 from app.executor import Executor
 from app.paths import SEED_GOALS
-from app.planner import PlannerError, build_plan
+from app.planner import DeadBranchError, PlannerError, build_plan
 from app.providers import make_provider
 from app.registry import build_registry
 
@@ -51,9 +51,16 @@ def _render_trace(request: Request, run_id: str) -> HTMLResponse:
     )
 
 
-def _error(request: Request, message: str) -> HTMLResponse:
-    """Render a friendly error card into the HTMX target (status 200 so it swaps)."""
-    return templates.TemplateResponse(request, "_error.html", {"message": message})
+def _error(request: Request, message: str, *, override_goal: str | None = None,
+           override_action: str | None = None) -> HTMLResponse:
+    """Render a friendly error card into the HTMX target (status 200 so it swaps).
+
+    When `override_goal`/`override_action` are set, the card also offers a "…anyway" button that
+    re-submits with `allow_dead_branches=true` — the deliberate override for a dead-branch plan."""
+    return templates.TemplateResponse(
+        request, "_error.html",
+        {"message": message, "override_goal": override_goal, "override_action": override_action},
+    )
 
 
 @app.get("/health")
@@ -75,10 +82,13 @@ def index(request: Request) -> HTMLResponse:
 
 
 @app.post("/plan", response_class=HTMLResponse)
-def plan(request: Request, goal: str = Form("")) -> HTMLResponse:
+def plan(request: Request, goal: str = Form(""), allow_dead_branches: bool = Form(False)) -> HTMLResponse:
     """Produce, persist, and render an inspectable plan for a goal."""
     try:
-        plan_obj = build_plan(goal, _registry, make_provider(_settings))
+        plan_obj = build_plan(goal, _registry, make_provider(_settings),
+                              allow_dead_branches=allow_dead_branches)
+    except DeadBranchError as exc:
+        return _error(request, str(exc), override_goal=goal, override_action="/plan")
     except PlannerError as exc:
         return _error(request, str(exc))
 
@@ -93,10 +103,13 @@ def plan(request: Request, goal: str = Form("")) -> HTMLResponse:
 
 
 @app.post("/run", response_class=HTMLResponse)
-def run(request: Request, goal: str = Form("")) -> HTMLResponse:
+def run(request: Request, goal: str = Form(""), allow_dead_branches: bool = Form(False)) -> HTMLResponse:
     """Plan, persist, then execute under guardrails (pausing at checkpoints)."""
     try:
-        plan_obj = build_plan(goal, _registry, make_provider(_settings))
+        plan_obj = build_plan(goal, _registry, make_provider(_settings),
+                              allow_dead_branches=allow_dead_branches)
+    except DeadBranchError as exc:
+        return _error(request, str(exc), override_goal=goal, override_action="/run")
     except PlannerError as exc:
         return _error(request, str(exc))
 

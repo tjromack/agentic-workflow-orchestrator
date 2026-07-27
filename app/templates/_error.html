@@ -1,5 +1,17 @@
 <div class="card" style="border-color:#c0392b;">
   <p style="margin-top:0; color:#c0392b;"><strong>Couldn't proceed.</strong></p>
   <p>{{ message }}</p>
-  <p class="tag">Adjust the goal and try again.</p>
+  {% if override_goal and override_action %}
+    <p class="tag">A dead branch is a warning, not always a blocker — you can run it anyway (the orphaned
+    step's output will be produced and discarded).</p>
+    <form hx-post="{{ override_action }}" hx-target="#plan" hx-swap="innerHTML" hx-disabled-elt="button" style="display:inline;">
+      <input type="hidden" name="goal" value="{{ override_goal }}" />
+      <input type="hidden" name="allow_dead_branches" value="true" />
+      <button type="submit">
+        {{ "Run anyway" if override_action == "/run" else "Plan anyway" }}
+      </button>
+    </form>
+  {% else %}
+    <p class="tag">Adjust the goal and try again.</p>
+  {% endif %}
 </div>

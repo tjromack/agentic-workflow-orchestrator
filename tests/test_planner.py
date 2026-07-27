@@ -147,7 +147,7 @@ def test_wellformed_refs_pass_and_deterministic_plan_still_validates():
 
 
 def test_orphaned_step_is_rejected():
-    from app.planner import _validate_against_registry, _validate_no_dead_branches
+    from app.planner import DeadBranchError, _validate_against_registry, _validate_no_dead_branches
 
     reg = build_registry()
     steps = _steps(
@@ -162,7 +162,8 @@ def test_orphaned_step_is_rejected():
         }),
     )
     _validate_against_registry(steps, reg)  # sets .consequential from the registry
-    with pytest.raises(PlannerError, match=r"dead branch.*\[4\]"):
+    # A dead branch raises the *distinguishable* error (so the web UI can offer "plan anyway").
+    with pytest.raises(DeadBranchError, match=r"dead branch.*\[4\]"):
         _validate_no_dead_branches(steps)
 
 

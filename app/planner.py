@@ -35,6 +35,11 @@ class PlannerError(Exception):
     """Raised when a proposed plan is invalid (e.g. names a disallowed tool)."""
 
 
+class DeadBranchError(PlannerError):
+    """A plan has an orphaned (dead-branch) step. Unlike other planner errors this is
+    *overridable*: the caller may re-plan with ``allow_dead_branches=True`` to run it anyway."""
+
+
 @dataclass
 class PlanStep:
     index: int  # 1-based position in the plan
@@ -218,7 +223,7 @@ def _validate_no_dead_branches(
         if s.index != terminal and not s.consequential and s.index not in consumed
     ]
     if dead:
-        raise PlannerError(
+        raise DeadBranchError(
             f"Plan has a dead branch: step(s) {dead} produce output that no later step "
             f"uses and that isn't the final result — they would run and be discarded. "
             f"Rewrite the plan so their output is consumed, or drop the step. "

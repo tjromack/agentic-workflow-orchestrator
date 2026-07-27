@@ -258,3 +258,18 @@ These are the script for "why did you build it this way?" Add an entry on every 
 - Rejected: Adding a `started_at` column (a schema migration for what the events already record); leaving one
   blended number (conflates machine time and human time — the whole complaint); subtracting a fixed fudge
   (the wait is variable). The event log was already the source of truth for *when* execution began.
+
+## 020. A dead-branch plan is overridable in the UI ("plan anyway"), not a dead-end
+- Decision: `_validate_no_dead_branches` raises a distinguishable **`DeadBranchError`** (subclass of
+  `PlannerError`). The web `/plan` and `/run` routes accept an `allow_dead_branches` form flag and, on a
+  `DeadBranchError`, render an error card with a **"Plan anyway" / "Run anyway"** button that re-submits the
+  same goal with `allow_dead_branches=true`. Other `PlannerError`s (e.g. a disallowed tool) offer no override.
+- Why: Plan-graph validation rightly rejects an orphaned-step plan — but only the *live* LLM planner ever
+  produces one (the deterministic fallback is always coherent), so before this the web demo could hit a
+  reject with no way forward. A dead branch is a *warning* (the orphaned step runs and is discarded), not a
+  safety violation, so the right UX is a deliberate, one-click override — the override already existed as
+  `build_plan(allow_dead_branches=True)`; this wires it to the UI. A disallowed-tool error is *not*
+  overridable, so only `DeadBranchError` gets the button.
+- Rejected: Auto-allowing dead branches (removes a useful signal — the planner produced waste); silently
+  dropping orphaned steps (changes the plan behind the user's back); one generic error with no path forward
+  (the original dead-end). Overriding stays a conscious click, and the trace still records it ran with the override.
