@@ -15,7 +15,8 @@
     <li style="margin-bottom:.7rem;">
       <code>{{ step.tool }}</code> — <strong>{{ step.status }}</strong>
       {% if step.consequential %}<span class="tag" style="color:#b9770e;">consequential</span>{% endif %}
-      {% if step.attempts %}<span class="tag">({{ step.attempts }} attempt{{ "s" if step.attempts > 1 }}{% if step.duration_ms is not none %}, {{ step.duration_ms }} ms{% endif %})</span>{% endif %}
+      {% if step.attempts %}<span class="tag">({{ step.attempts }} attempt{{ "s" if step.attempts > 1 }}{% if step.duration_ms is not none %}, {{ step.duration_ms }} ms exec{% endif %})</span>{% endif %}
+      {% if step.waiting_ms %}<span class="tag" style="color:#b9770e;">waited {{ step.waiting_ms }} ms for approval</span>{% endif %}
       <div class="tag">{{ step.description }}</div>
       {% if step.resolved_inputs is not none %}
       <details><summary class="tag">inputs</summary>

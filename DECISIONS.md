@@ -242,3 +242,19 @@ These are the script for "why did you build it this way?" Add an entry on every 
 - Rejected: Raising/lowering k per query (k is a count, not a relevance control — the floor is the right
   knob); a global constant with no override (a plan sometimes *wants* broad recall); re-ranking without
   filtering (the bug was inclusion, not order). Regression test reproduces the green-roofs/solar case.
+
+## 019. Step duration is execution-only; human-checkpoint wait is reported separately
+- Decision: A step's `duration_ms` is measured from its **STEP_STARTED** event (which fires *after* a
+  consequential step's checkpoint is approved) to its end — so it is execution time only. The pause a step
+  spent awaiting human approval is reported as a separate **`waiting_ms`** (from the step's `created_at`,
+  stamped when it first paused, to STEP_STARTED; clamped to ≥0 for non-paused steps). The viewer shows
+  "N ms exec" and, when there was a pause, "waited N ms for approval".
+- Why: The previous `duration_ms` ran from `created_at` to `updated_at`; for a consequential step,
+  `created_at` is stamped when it *pauses* for approval, so the duration swallowed the human-think time —
+  once **199,556 ms** vs ~5 ms for the auto steps (2026-07-18). Any cost/latency metric built on that would
+  be badly misleading. Deriving execution start from STEP_STARTED (post-approval) is a pure read-side fix —
+  no schema migration, and it splits the two genuinely different quantities: how long the *tool* took vs how
+  long the *human* took.
+- Rejected: Adding a `started_at` column (a schema migration for what the events already record); leaving one
+  blended number (conflates machine time and human time — the whole complaint); subtracting a fixed fudge
+  (the wait is variable). The event log was already the source of truth for *when* execution began.

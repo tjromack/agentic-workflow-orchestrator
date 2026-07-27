@@ -44,14 +44,26 @@ def get_trace(run_id: str) -> dict[str, Any] | None:
     run_start = _parse(run["created_at"])
     last_end = run_start
 
+    # When each step actually STARTED EXECUTING — the STEP_STARTED event fires *after* any human
+    # checkpoint is approved, so timing from here excludes the human-wait. A step's `created_at` is
+    # stamped when it's first recorded (which, for a consequential step, is when it *paused* for
+    # approval), so `created_at → started` is the waiting time, `started → end` is the executing time.
+    step_started: dict[int, datetime] = {}
+    for e in store.get_events(run_id):
+        if e["kind"] == Event.STEP_STARTED and e["step_index"] is not None:
+            t = _parse(e["created_at"])
+            if t and (e["step_index"] not in step_started or t < step_started[e["step_index"]]):
+                step_started[e["step_index"]] = t
+
     steps: list[dict[str, Any]] = []
     pending_index: int | None = None
     brief: str | None = None
 
     for ps in (plan["steps"] if plan else []):
         es = exec_steps.get(ps["index"])
-        start = _parse(es["created_at"]) if es else None
+        created = _parse(es["created_at"]) if es else None
         end = _parse(es["updated_at"]) if es else None
+        started = step_started.get(ps["index"])  # true execution start (post-approval)
         if end and (not last_end or end > last_end):
             last_end = end
 
@@ -74,7 +86,11 @@ def get_trace(run_id: str) -> dict[str, Any] | None:
             "resolved_inputs": _load(es["inputs_json"]) if es else None,
             "output": output,
             "error": es["error"] if es else None,
-            "duration_ms": _ms(start, end),
+            # executing time excludes any human-checkpoint wait (measured from STEP_STARTED)…
+            "duration_ms": _ms(started or created, end),
+            # …and the wait itself is reported separately (0 when there was no checkpoint pause; the
+            # max() drops the few-ms event-vs-row ordering noise into a clean 0 for non-paused steps).
+            "waiting_ms": max(0, _ms(created, started)) if (created and started) else None,
         })
 
     events: list[dict[str, Any]] = []

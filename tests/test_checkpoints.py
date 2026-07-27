@@ -1,9 +1,11 @@
 """Phase 4 gate: a run halts at a checkpoint and only proceeds on explicit
 approval; the decision is recorded; rejection halts the run."""
 
+import time
+
 import pytest
 
-from app import checkpoints, store
+from app import audit, checkpoints, store
 from app.checkpoints import CheckpointError
 from app.executor import Event, Executor, RunStatus, StepStatus
 from app.planner import build_plan
@@ -37,6 +39,21 @@ def test_run_pauses_then_completes_on_approval(tmp_path, monkeypatch):
     kinds = [e["kind"] for e in store.get_events(run_id)]
     assert Event.HUMAN_DECISION in kinds
     assert kinds.count(Event.CHECKPOINT_REQUIRED) == 1
+
+
+def test_step_timing_separates_human_wait_from_execution(tmp_path, monkeypatch):
+    # Regression (2026-07-18): a consequential step's duration counted the human-checkpoint wait
+    # (199,556 ms once). Now `duration_ms` is execution-only (from STEP_STARTED) and the wait is `waiting_ms`.
+    reg, run_id = _start_paused_run(tmp_path, monkeypatch)
+    time.sleep(0.06)  # simulate a human deliberating at the checkpoint
+    checkpoints.resume(reg, run_id, "approve")
+
+    steps = {s["index"]: s for s in audit.get_trace(run_id)["steps"]}
+    cp = steps[3]  # the consequential step that paused for approval
+    assert cp["waiting_ms"] is not None and cp["waiting_ms"] >= 50   # the wait is captured…
+    assert cp["duration_ms"] < cp["waiting_ms"]                       # …and NOT billed as execution
+    # a non-consequential step never paused -> clean 0 wait (no event/row-ordering noise)
+    assert steps[1]["waiting_ms"] == 0
 
 
 def test_rejection_halts_and_is_recorded(tmp_path, monkeypatch):
