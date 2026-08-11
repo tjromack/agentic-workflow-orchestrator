@@ -1,5 +1,8 @@
 # Agentic Workflow Orchestrator
 
+> © 2026 Trevor J. Romack — **source-available for review, not open-source** ([LICENSE](LICENSE)). No reuse or
+> commercial use without permission. · tjromack@gmail.com
+
 A general-purpose engine for running multi-step AI workflows safely: a **tool registry** feeds
 a **planner**, a **stepwise executor** runs the plan under **guardrails**, **human checkpoints**
 gate consequential steps, and an **audit log** records everything. Swap the tools and the data,
