@@ -7,7 +7,7 @@ else
 	PY := .venv/bin/python
 endif
 
-.PHONY: install seed run test reset fmt
+.PHONY: install seed run test guardrails reset fmt
 
 install:        ## Create venv + install dependencies
 	python -m venv .venv
@@ -22,6 +22,9 @@ run:            ## Start the FastAPI dev server
 
 test:           ## Run the test suite
 	$(PY) -m pytest -q
+
+guardrails:     ## Exercise every guardrail and print the behaviour table (EVAL.md)
+	$(PY) -m app.guardrails
 
 reset:          ## Clear runs + re-seed for a clean demo
 	$(PY) -m app.seed --reset

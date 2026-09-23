@@ -69,3 +69,11 @@ make fmt       # format
 - Do not execute consequential/irreversible steps without a human checkpoint.
 - Do not run steps unbounded — always enforce the budget.
 - Do not use real/PHI data or rebuild internal tooling; do not pass an approval gate without approval.
+
+## Case study voice
+State plainly what the system is, what it does, the decisions made, and what was learned.
+
+- No disclaimers about the author's experience. Limits belong to the system, stated as scope or cost.
+- No honesty signalling ("the honest version", "published as a loss"). State the number.
+- No apologising for scale. State the numbers and the design target.
+- Real limits, costs, and failures stay — as facts about the system, not confessions.
