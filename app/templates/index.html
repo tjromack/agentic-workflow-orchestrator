@@ -4,8 +4,9 @@
 <p class="tag"><a href="/runs">Browse the audit log &rarr;</a></p>
 <div class="card">
   <p><strong>Pose a goal.</strong> The planner emits an explicit, inspectable plan —
-  each step uses only a registered, allowlisted tool — and nothing executes until
-  you can see it. (Execution lands in a later phase.)</p>
+  each step uses only a registered, allowlisted tool. <strong>Plan &amp; run</strong> executes it one step
+  at a time under guardrails, pausing at a consequential step for your approval; <strong>Plan it</strong>
+  shows the plan without running.</p>
 
   <form hx-target="#plan" hx-swap="innerHTML" hx-disabled-elt="button">
     <textarea name="goal" rows="2" required style="width:100%; box-sizing:border-box;"
