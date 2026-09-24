@@ -15,6 +15,12 @@ and the same core drives very different jobs.
 consequential steps, schema-validated tool output, and an allow-listed registry — with every guardrail exercised and
 published (`make guardrails`, `EVAL.md`).
 
+![Plan & run: the executor runs an inspectable plan step by step and pauses at the consequential step for human approval](docs/agent-orchestrator-demo.gif)
+
+*`Plan & run` on a goal: the planner emits an inspectable three-step plan, the executor runs it one step at a time, and
+it **pauses at the consequential `write_brief` step for human approval** — nothing irreversible runs until you approve.
+Every step and guardrail decision lands in the audit trace.*
+
 ---
 
 ## The problem it solves

@@ -273,3 +273,19 @@ These are the script for "why did you build it this way?" Add an entry on every 
 - Rejected: Auto-allowing dead branches (removes a useful signal — the planner produced waste); silently
   dropping orphaned steps (changes the plan behind the user's back); one generic error with no path forward
   (the original dead-end). Overriding stays a conscious click, and the trace still records it ran with the override.
+
+## 021. An invalid LLM plan (type-mismatched refs) falls back to deterministic; a disallowed tool does not
+- Decision: In `build_plan`, when a provider is configured, the LLM's plan is structurally validated *before* it is
+  returned. A **type-mismatched reference** (e.g. wiring `step1.documents` — an array — into an input that expects a
+  string) means the model wired otherwise-valid tools together incorrectly; `build_plan` **falls back to the
+  deterministic plan** and stamps `model_name` with `(fallback: PlannerError)` so the substitution is visible in the
+  plan/trace. A **disallowed / unregistered tool** is treated differently: it is **rejected** (`_validate_against_registry`
+  raises, uncaught), never swapped for a safe plan.
+- Why: A reviewer posing a free-form goal with a real key would otherwise hit a raw "this plan would fail at run time"
+  error when the model mis-wired a reference — a poor first impression for a demo whose story is the guardrails, not the
+  planner's wiring. The tools are all allowlisted and the deterministic plan is always coherent, so recovering to it is
+  safe and keeps the demo working on any goal. A disallowed tool is the opposite case: the model reaching for a tool it
+  was not given is exactly the attempt the allow-list exists to surface, so it stays a loud rejection.
+- Rejected: Falling back on *every* validation failure (would hide a disallowed-tool attempt — a security signal);
+  surfacing the raw ref error to the user (the pre-fix behaviour — a dead-end for a casual reviewer); silently swapping
+  without recording it (changes the plan behind the user's back — the `(fallback: …)` stamp keeps it honest).

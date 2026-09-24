@@ -355,13 +355,28 @@ def build_plan(
         steps = _deterministic_steps(goal)
         model_provider, model_name = "deterministic", DETERMINISTIC_MODEL
     else:
+        fallback_reason: str | None = None
         try:
             steps = _llm_steps(goal, registry, provider)
+        except Exception as exc:  # noqa: BLE001 — provider unavailable / returned no usable steps
+            steps, fallback_reason = _deterministic_steps(goal), type(exc).__name__
+        else:
+            # The allow-list is a HARD guardrail: a disallowed/unregistered tool is rejected, never
+            # swapped for a safe plan — surfacing the attempt is the point.
+            _validate_against_registry(steps, registry)
+            # A type-mismatched reference means the model wired otherwise-valid tools together
+            # incorrectly. That is recoverable: fall back to the (always-valid) deterministic plan
+            # rather than surface a raw validation error to the user.
+            try:
+                _validate_refs(steps, registry)
+            except PlannerError as exc:
+                steps, fallback_reason = _deterministic_steps(goal), type(exc).__name__
+
+        if fallback_reason is None:
             model_provider, model_name = provider.name, provider.model
-        except Exception as exc:  # noqa: BLE001 — resilient demo fallback
-            steps = _deterministic_steps(goal)
+        else:
             model_provider = "deterministic"
-            model_name = f"{DETERMINISTIC_MODEL} (fallback: {type(exc).__name__})"
+            model_name = f"{DETERMINISTIC_MODEL} (fallback: {fallback_reason})"
 
     _validate_against_registry(steps, registry)
     _validate_refs(steps, registry)

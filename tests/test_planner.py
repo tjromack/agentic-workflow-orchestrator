@@ -9,6 +9,34 @@ from app.planner import PROMPT_VERSION, PlannerError, PlanStep, build_plan
 from app.registry import build_registry
 
 
+class _RefMismatchProvider:
+    """A provider whose plan uses valid tools but wires a reference of the wrong type
+    (step1.documents is an array; summarize_sources.question expects a string)."""
+    name = "fake"
+    model = "fake-1"
+
+    def complete(self, system: str, user: str) -> str:
+        return json.dumps({"steps": [
+            {"index": 1, "tool": "retrieve_documents", "inputs": {"query": "x"}, "expected_output": "docs"},
+            {"index": 2, "tool": "summarize_sources",
+             "inputs": {"question": {"$ref": "step1.documents"}, "documents": {"$ref": "step1.documents"}},
+             "expected_output": "summary"},
+        ]})
+
+
+def test_invalid_llm_plan_falls_back_to_the_deterministic_plan():
+    """A model that wires valid tools together incorrectly (a type-mismatched reference) must not
+    surface a raw validation error — build_plan falls back to the always-valid deterministic plan
+    and records that it did. (A *disallowed tool* is different: it is rejected, not swapped — see
+    test_plan_rejects_disallowed_tool.)"""
+    reg = build_registry()
+    plan = build_plan("Any goal", reg, _RefMismatchProvider())
+
+    assert [s.tool for s in plan.steps] == ["retrieve_documents", "summarize_sources", "write_brief"]
+    assert plan.model_provider == "deterministic"
+    assert "fallback" in plan.model_name  # the fallback is stamped, not hidden
+
+
 def test_deterministic_plan_is_ordered_and_allowlisted():
     reg = build_registry()
     plan = build_plan("Brief on urban green roofs", reg, provider=None)
