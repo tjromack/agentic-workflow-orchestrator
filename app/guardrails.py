@@ -92,8 +92,8 @@ def _disallowed():
             Event.DISALLOWED_TOOL in _events(r), r.status == RunStatus.FAILED)
 
 
-def _timed_steps() -> int:
-    """Run one persisted happy path in a temp DB; return how many steps carry a recorded duration in the audit trace."""
+def _plan_metrics():
+    """Run one persisted happy path in a temp DB; return (n_steps, total_ms, [per-step ms]) from the audit trace."""
     from app import audit, store
     with tempfile.TemporaryDirectory() as d:
         os.environ["DB_PATH"] = os.path.join(d, "gr.db")
@@ -104,7 +104,10 @@ def _timed_steps() -> int:
         store.save_plan(run_id, plan)
         Executor(reg).run(run_id, plan, approvals={3: True})
         trace = audit.get_trace(run_id) or {}
-        return sum(1 for s in trace.get("steps", []) if s.get("duration_ms") is not None)
+        steps = trace.get("steps", [])
+        per_step = [s.get("duration_ms") for s in steps]
+        total = (trace.get("timings") or {}).get("total_ms")
+        return len(steps), total, per_step
 
 
 def main() -> None:
@@ -130,9 +133,14 @@ def main() -> None:
         mark = "✓" if (event_fired and ok) else "✗"
         print(f"  {name:<38} {guardrail:<20} {str(status):<20} {mark}")
 
-    timed = _timed_steps()
-    print(f"\n  Every step is timed in the audit trace: {timed}/3 steps carry a recorded duration_ms on a persisted run")
-    print("  (the demo tools are deterministic and near-instant, so the numbers reflect orchestration, not tool work).")
+    n_steps, total_ms, per_step = _plan_metrics()
+    ex = Executor(build_registry())  # read the configured ceilings
+    print("\n  Per plan (a normal research-to-brief run):")
+    print(f"    steps: {n_steps}   ·   total latency: {total_ms} ms   ·   per-step: {per_step} ms")
+    print(f"    ceilings — step budget: {ex.max_steps} steps (a plan over it halts: BUDGET_EXCEEDED)   ·   "
+          f"retries: {ex.max_attempts} per step, then halt")
+    print("    (demo tools are deterministic and near-instant, so latency is orchestration overhead, not tool/model work;")
+    print("     in a real deployment 'cost' is the model-call budget that the step budget bounds.)")
 
     all_ok = ok_happy and all(ev and ok for _, _, _, ev, ok in checks)
     print(f"\nVERDICT: {'PASS — every guardrail fires as designed.' if all_ok else 'FAIL — a guardrail did not fire.'}")

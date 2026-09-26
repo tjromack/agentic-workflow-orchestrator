@@ -37,13 +37,20 @@ Guardrail behaviour — the orchestrator's safety story, exercised
   Tool output violates its schema        schema validation    failed               ✓
   Plan calls an unregistered tool        allow-listed tools   failed               ✓
 
-  Every step is timed in the audit trace: 3/3 steps carry a recorded duration_ms on a persisted run
+  Per plan (a normal research-to-brief run):
+    steps: 3   ·   total latency: 35 ms   ·   per-step: [6, 6, 7] ms
+    ceilings — step budget: 10 steps (a plan over it halts: BUDGET_EXCEEDED)   ·   retries: 2 per step, then halt
 
 VERDICT: PASS — every guardrail fires as designed.
 ```
 
-Every step and every guardrail decision is written to an append-only audit trail (`app/audit.py`), so a completed or
-halted run can be reconstructed after the fact — the trace carries per-step `duration_ms` and a run `total_ms`.
+**Per-plan numbers, and the ceiling.** A normal run is **3 steps**; each step and the whole run are timed in the audit
+trace (here **~35 ms total**, single-digit ms per step — the demo tools are deterministic and near-instant, so the
+number is orchestration overhead, not tool or model latency). The resource ceilings are explicit: the **step budget**
+(default **10 steps**) refuses and halts a larger plan (`BUDGET_EXCEEDED`), and the **retry limit** (default **2
+attempts**) tolerates a transient tool error then halts. In a real deployment the analogue of "cost" is the model-call
+budget, which the step budget bounds directly. Every step and guardrail decision is written to an append-only audit
+trail (`app/audit.py`), so a completed or halted run can be reconstructed after the fact.
 
 ## Limits
 
